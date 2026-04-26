@@ -6,9 +6,9 @@ A production-grade **movie review sentiment classifier** built from scratch usin
 
 ## 📸 Screenshots
 
-| Web App | Model Comparison |
-|---|---|
-| ![Web App](assets/webapp.png) | ![Model Comparison](assets/model_comparison.png) |
+| Model Comparison |
+|---|
+| ![Model Comparison](assets/model_comparison.png) |
 
 | Confusion Matrix | ROC Curve | Feature Importance |
 |---|---|---|
@@ -45,6 +45,7 @@ sentiment-analysis/
 ├── templates/
 │   └── index.html              # Flask frontend
 │
+├── assets/                     # Project screenshots
 ├── data/                       # Place dataset here (not committed)
 ├── outputs/                    # Saved models + plots (not committed)
 │
@@ -61,12 +62,13 @@ sentiment-analysis/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/sentiment-analysis.git
+git clone https://github.com/BasuPatil09/sentiment-analysis.git
 cd sentiment-analysis
 
 # 2. Create a virtual environment
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+source .venv/bin/activate     # Mac/Linux
 
 # 3. Install dependencies
 pip install -r requirements.txt
@@ -181,15 +183,6 @@ After training, the following plots are saved to `outputs/`:
 | Visualization | Matplotlib, Seaborn, Chart.js |
 | Serialization | joblib |
 | Dataset | IMDB 50K Movie Reviews |
-
----
-
-## 📁 .gitignore Notes
-
-The following are excluded from version control:
-- `data/` — raw dataset files (download from Kaggle)
-- `outputs/` — trained model `.joblib` files and generated plots
-- `venv/` — virtual environment
 
 ---
 
