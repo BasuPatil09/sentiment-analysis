@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sentiment Analysis</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    /* ── Analyse button — separate class so it never inherits .tab styles ── */
+    .btn-analyse {
+      margin-top: 10px;
+      padding: 10px 24px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn-analyse:hover { background: #45a049; }
+
+    #result {
+      margin-top: 16px;
+      font-size: 18px;
+      font-weight: bold;
+      display: none;
+    }
+    #result.positive { color: #4CAF50; }
+    #result.negative { color: #f44336; }
+
+    #confidence {
+      margin-top: 6px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    #error {
+      color: red;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+    }
+
+    /* ── Tab row ── */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* Base tab — NOT a generic <button>, use explicit class only */
+    .tab {
+      padding: 6px 16px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .tab:hover:not(.active) {
+      background: #f0f0f0;
+    }
+    .tab.active {
+      background: #4CAF50;
+      color: white;
+      border-color: #4CAF50;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎬 Sentiment Analysis</h1>
+
+  <div class="card">
+    <h3>Enter a Movie Review</h3>
+    <textarea id="inputText" placeholder="Type a movie review here..."></textarea>
+    <br/>
+    <!-- Use .btn-analyse — never .tab — so active styles can't bleed across -->
+    <button class="btn-analyse" onclick="predict()">Analyse</button>
+    <div id="error"></div>
+    <div id="result"></div>
+    <div id="confidence"></div>
+  </div>
+
+  <div class="card">
+    <h3>Model Comparison</h3>
+    <div class="tabs" id="tabRow">
+      <button class="tab active" data-metric="accuracy">Accuracy</button>
+      <button class="tab"        data-metric="f1_macro">F1 Score</button>
+      <button class="tab"        data-metric="roc_auc">ROC-AUC</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    /* ── Predict ─────────────────────────────────────────────────────── */
+    async function predict() {
+      const text   = document.getElementById('inputText').value.trim();
+      const result = document.getElementById('result');
+      const conf   = document.getElementById('confidence');
+      const error  = document.getElementById('error');
+
+      result.style.display = 'none';
+      error.style.display  = 'none';
+      conf.textContent     = '';
+
+      if (!text) {
+        error.textContent   = 'Please enter some text.';
+        error.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res  = await fetch('/predict', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ text }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          error.textContent   = data.error;
+          error.style.display = 'block';
+          return;
+        }
+
+        const isPos          = data.label === 'POSITIVE';
+        result.textContent   = isPos ? '👍 POSITIVE' : '👎 NEGATIVE';
+        result.className     = isPos ? 'positive' : 'negative';
+        result.style.display = 'block';
+
+        conf.textContent = data.confidence !== null
+          ? 'Confidence: ' + (data.confidence * 100).toFixed(1) + '%'
+          : '';
+
+      } catch (e) {
+        error.textContent   = 'Something went wrong. Is the server running?';
+        error.style.display = 'block';
+      }
+    }
+
+    /* ── Chart ───────────────────────────────────────────────────────── */
+    let chartInstance  = null;
+    let allData        = {};
+    let currentMetric  = 'accuracy';
+
+    const BAR_COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336'];
+
+    async function loadChart() {
+      try {
+        const res = await fetch('/compare');
+        allData   = await res.json();
+        renderChart(currentMetric);
+      } catch (e) {
+        console.error('Failed to load model comparison data:', e);
+      }
+    }
+
+    function renderChart(metric) {
+      const labels = Object.keys(allData);
+      const values = labels.map(m => +(allData[m][metric] * 100).toFixed(2));
+      const rawMin = Math.min(...values);
+      const minVal = Math.max(0, Math.floor((rawMin - 2) / 2) * 2); // round down to nearest even number
+
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+
+      chartInstance = new Chart(document.getElementById('chart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label:           metric,
+            data:            values,
+            backgroundColor: BAR_COLORS.slice(0, labels.length),
+            borderRadius:    4,
+          }]
+        },
+        options: {
+          responsive:          true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              min: minVal,
+              max: 100,
+              ticks: { stepSize: 2, callback: v => v + '%' }
+            }
+          }
+        }
+      });
+    }
+
+    /* ── Tab switching — event delegation, single source of truth ───── */
+    document.getElementById('tabRow').addEventListener('click', function (e) {
+      const btn = e.target.closest('.tab');
+      if (!btn) return;
+
+      // Remove active from all tabs in THIS row only
+      this.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+
+      currentMetric = btn.dataset.metric;
+      renderChart(currentMetric);
+    });
+
+    loadChart();
+  </script>
+</body>
+</html>
