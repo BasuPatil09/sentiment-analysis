@@ -37,8 +37,6 @@
       resize: vertical;
       box-sizing: border-box;
     }
-
-    /* ── Analyse button — separate class so it never inherits .tab styles ── */
     .btn-analyse {
       margin-top: 10px;
       padding: 10px 24px;
@@ -76,15 +74,11 @@
       position: relative;
       height: 280px;
     }
-
-    /* ── Tab row ── */
     .tabs {
       display: flex;
       gap: 8px;
       margin-bottom: 16px;
     }
-
-    /* Base tab — NOT a generic <button>, use explicit class only */
     .tab {
       padding: 6px 16px;
       border: 1px solid #ccc;
@@ -113,7 +107,6 @@
     <h3>Enter a Movie Review</h3>
     <textarea id="inputText" placeholder="Type a movie review here..."></textarea>
     <br/>
-    <!-- Use .btn-analyse — never .tab — so active styles can't bleed across -->
     <button class="btn-analyse" onclick="predict()">Analyse</button>
     <div id="error"></div>
     <div id="result"></div>
@@ -133,7 +126,6 @@
   </div>
 
   <script>
-    /* ── Predict ─────────────────────────────────────────────────────── */
     async function predict() {
       const text   = document.getElementById('inputText').value.trim();
       const result = document.getElementById('result');
@@ -178,8 +170,6 @@
         error.style.display = 'block';
       }
     }
-
-    /* ── Chart ───────────────────────────────────────────────────────── */
     let chartInstance  = null;
     let allData        = {};
     let currentMetric  = 'accuracy';
@@ -232,13 +222,10 @@
         }
       });
     }
-
-    /* ── Tab switching — event delegation, single source of truth ───── */
     document.getElementById('tabRow').addEventListener('click', function (e) {
       const btn = e.target.closest('.tab');
       if (!btn) return;
 
-      // Remove active from all tabs in THIS row only
       this.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
 
